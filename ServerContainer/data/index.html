@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main>
+        <div class="flexContainer">
+            <div>
+                <p id="title">WebSocketServer - <span id="connectionStatus">Disconnected</span></p>
+            </div>
+        </div>
+        <div class="flexContainer">
+            <select id="modeSelect">
+                <option value="moduleMode">Module</option>
+                <option value="ultraSonic">UltraSonic</option>
+                <option value="module2">Module 2</option>
+            </select>
+        </div>
+        <div class="top flexContainer"><p class="buttonUI" id="up">up</p></div>
+        <div class="flexContainer">
+            <div><p class="buttonUI" id="left">left</p></div>
+            <div><p class="buttonUI" id="down">down</p></div>
+            <div><p class="buttonUI" id="right">right</p></div>
+        </div>
+        <div><p id="status">Status</p></div>
+        <div class="flexContainer">
+            <div>
+                <canvas id="canvas" width="600" height="600"></canvas>
+            </div>
+        </div>
+        
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
