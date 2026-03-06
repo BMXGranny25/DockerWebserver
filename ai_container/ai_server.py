@@ -73,7 +73,7 @@ def build_transform():
     ])
 
 
-MODEL_PATH = os.environ.get("MODEL_PATH", r"D:\Downloads\MTMV\checkpoint_hp_1_epoch_10.pth") # change when deployed
+MODEL_PATH = os.environ.get("MODEL_PATH", "checkpoint_hp_1_epoch_10.pth") # change when deployed
 CLASS_NAMES = ["bad", "good"]   # swap if needed
 device = torch.device("cpu")
 
