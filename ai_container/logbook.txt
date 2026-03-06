@@ -1,0 +1,22 @@
+uses websocket
+esp32 is the server
+computer is the client
+
+need to connect to esp32 wifi
+
+can use localhost?
+
+can these all be in containers?
+ai will be in container?
+run ai on same local host as esp32 while in esp32 wifi
+esp32 sends image to the client in binary
+client can https to ai container
+ai container has image detector and binary to png converter
+once image is detected run ai and classifiy image
+send good or bad back to client
+
+to do:
+make image detector
+make containers
+make binary to png converter
+make ai work on single image
