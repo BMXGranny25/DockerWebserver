@@ -153,21 +153,13 @@ async def handle_binary_image(websocket, image_bytes: bytes):
     try:
         label, confidence = predict_file(temp_file)
         logger.info("Prediction: %s (%.4f)", label, confidence)
-        if (round(confidence,4)>.75):
-            result_msg = label + "," + str(round(confidence),4)
 
-            # changed to send oly if confidence is above 75%
-            # changed message to send as result,confiedence
-            # ex good,0.8753
-            
-        #result_msg = {
-            #"type": "classification",
-            #"prediction": label,
-            #"confidence": round(confidence, 4),
-        #}
-        # if confiedence over 75% send yes or no
-        await websocket.send(result_msg)#json.dumps(result_msg))
-        logger.info("Sent result back: %s", result_msg)
+        if confidence > 0.75:
+            result_msg = f"{label},{confidence:.4f}"
+            await websocket.send(result_msg)
+            logger.info("Sent result back: %s", result_msg)
+        else:
+            logger.info("Confidence below threshold, not sending result")
 
     except Exception as e:
         logger.exception("Prediction failed: %s", e)

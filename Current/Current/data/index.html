@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main>
+        <!---->
+        <div class="header">
+            <div>
+                <p id="title">WebSocketServer - <span id="connectionStatus">Disconnected</span></p>
+            </div>
+            <div>
+                <select id="modeSelect">
+                    <option value="moduleMode">Module</option>
+                    <option value="ultraSonic">UltraSonic</option>
+                    <option value="module2">Module 2</option>
+                </select>
+            </div>
+        </div>
+        <!---->
+        <div class="flexContainer bodyContainer">
+            <div class="flexContainer2">
+                <div class="flexContainer2">
+                    <div class="top flexContainer"><p class="buttonUI" id="up">up</p></div>
+                    <div class="flexContainer">
+                        <div><p class="buttonUI" id="left">left</p></div>
+                        <div><p class="buttonUI" id="down">down</p></div>
+                        <div><p class="buttonUI" id="right">right</p></div>
+                    </div>
+                </div>
+                <div>
+                    <canvas id="canvas" width="600" height="600"></canvas>
+                </div>
+            </div>
+            <div class="flexContainer cameraModule">
+                <div>
+                    <img id="cameraFeed">
+                </div>
+                <div>
+                    <button id="takePhoto">Take Photo</button>
+                </div>
+            </div>
+            <div class="statusContainer">
+                <p id="status">Status</p>
+            </div>
+        </div>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
