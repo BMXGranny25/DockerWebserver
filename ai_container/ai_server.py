@@ -1,16 +1,43 @@
+import asyncio
+import logging
 import os
-import tempfile
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 import torch
 import torch.nn as nn
 import timm
+import websockets
 from fastapi import FastAPI, UploadFile, File
 from PIL import Image
 from torchvision import transforms
+import json
+
+# -----------------------------
+# Logging
+# -----------------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ai_server")
+
+# -----------------------------
+# Config
+# -----------------------------
+MODEL_PATH = os.environ.get("MODEL_PATH", "checkpoint_hp_1_epoch_10.pth")
+CLASS_NAMES = ["bad", "good"]  # swap if needed
+WS_URL = os.environ.get("WS_URL", "ws://192.168.4.1/ws")
+TEMP_DIR = Path(os.environ.get("TEMP_DIR", "TempImage"))
+TEMP_FILE = TEMP_DIR / "image.jpg"
+RECONNECT_DELAY = float(os.environ.get("RECONNECT_DELAY", "2"))
+
+device = torch.device("cpu")
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
+# -----------------------------
+# Model helpers
+# -----------------------------
 def is_svt_feasible(filter_matrix, threshold=0.1):
-    u, s, v = torch.svd(filter_matrix)
+    _, s, _ = torch.svd(filter_matrix)
     return torch.min(s) > threshold
 
 
@@ -73,14 +100,8 @@ def build_transform():
     ])
 
 
-MODEL_PATH = os.environ.get("MODEL_PATH", "checkpoint_hp_1_epoch_10.pth") # change when deployed
-CLASS_NAMES = ["bad", "good"]   # swap if needed
-device = torch.device("cpu")
-
 model = load_model(MODEL_PATH, device=device, num_classes=2)
 transform = build_transform()
-
-app = FastAPI()
 
 
 @torch.no_grad()
@@ -97,6 +118,93 @@ def predict_pil_image(image: Image.Image):
     return label, confidence
 
 
+def predict_file(image_path: Path):
+    image = Image.open(image_path).convert("RGB")
+    return predict_pil_image(image)
+
+
+# -----------------------------
+# WebSocket listener
+# -----------------------------
+async def handle_binary_image(websocket, image_bytes: bytes):
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+    with open(TEMP_FILE, "wb") as f:
+        f.write(image_bytes)
+
+    logger.info("Saved image to %s (%d bytes)", TEMP_FILE, len(image_bytes))
+
+    try:
+        label, confidence = predict_file(temp_file)
+        logger.info("Prediction: %s (%.4f)", label, confidence)
+
+        result_msg = {
+            "type": "classification",
+            "prediction": label,
+            "confidence": round(confidence, 4)
+        }
+
+    except Exception as e:
+        logger.exception("Prediction failed: %s", e)
+
+    finally:
+        try:
+            if TEMP_FILE.exists():
+                TEMP_FILE.unlink()
+                logger.info("Deleted temp file: %s", TEMP_FILE)
+        except Exception as e:
+            logger.warning("Could not delete temp file %s: %s", TEMP_FILE, e)
+
+
+async def websocket_worker():
+    while True:
+        try:
+            logger.info("Connecting to websocket: %s", WS_URL)
+
+            async with websockets.connect(
+                WS_URL,
+                max_size=None,
+                ping_interval=20,
+                ping_timeout=20
+            ) as websocket:
+                logger.info("Connected to websocket server")
+
+                async for message in websocket:
+                    if isinstance(message, bytes):
+                        print("Received image bytes:", len(message))
+                        await handle_binary_image(websocket, message)
+                    else:
+                        logger.info("Received non-binary message: %s", message)
+
+        except Exception as e:
+            logger.warning("Websocket connection lost or failed: %s", e)
+            logger.info("Reconnecting in %s seconds...", RECONNECT_DELAY)
+            await asyncio.sleep(RECONNECT_DELAY)
+
+
+# -----------------------------
+# FastAPI lifespan
+# -----------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(websocket_worker())
+    logger.info("Started websocket listener task")
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            logger.info("Websocket listener task cancelled")
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+# -----------------------------
+# Existing test endpoints
+# -----------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -104,19 +212,20 @@ def health():
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    suffix = os.path.splitext(file.filename)[1] if file.filename else ".png"
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+    suffix = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
+    temp_path = TEMP_DIR / f"manual_upload{suffix}"
 
     try:
-        image = Image.open(tmp_path).convert("RGB")
+        with open(temp_path, "wb") as f:
+            f.write(await file.read())
+
+        image = Image.open(temp_path).convert("RGB")
         label, confidence = predict_pil_image(image)
+
         return {
             "prediction": label,
             "confidence": confidence
         }
     finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if temp_path.exists():
+            temp_path.unlink()
